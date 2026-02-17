@@ -16,6 +16,7 @@ import { useQuestStore } from '@/stores/useQuestStore'
 import { useFishingStore } from '@/stores/useFishingStore'
 import { useBreedingStore } from '@/stores/useBreedingStore'
 import { useHanhaiStore } from '@/stores/useHanhaiStore'
+import { useSettingsStore } from '@/stores/useSettingsStore'
 import { getItemById, getTodayEvent, getNpcById, getCropById } from '@/data'
 import { RECIPES } from '@/data/recipes'
 import { CAVE_UNLOCK_EARNINGS } from '@/data/buildings'
@@ -24,6 +25,7 @@ import { addLog, showFloat } from './useGameLog'
 import { getDailyMarketInfo, MARKET_CATEGORY_NAMES } from '@/data/market'
 import { showEvent, showFestival, triggerWeddingEvent, triggerPetAdoption } from './useDialogs'
 import { sfxSleep, useAudio } from './useAudio'
+import { useWebdavBackup } from './useWebdavBackup'
 import router from '@/router'
 
 const NPC_NAME_MAP: Record<string, string> = {
@@ -291,6 +293,7 @@ export const handleEndDay = () => {
   const farmStore = useFarmStore()
   const inventoryStore = useInventoryStore()
   const saveStore = useSaveStore()
+  const { enqueueAutoBackup } = useWebdavBackup()
   const npcStore = useNpcStore()
   const cookingStore = useCookingStore()
   const processingStore = useProcessingStore()
@@ -782,7 +785,14 @@ export const handleEndDay = () => {
   void router.push({ name: 'farm' })
 
   // 自动存档
-  saveStore.autoSave()
+  const autoSaved = saveStore.autoSave()
+  if (autoSaved) {
+    const settingsStore = useSettingsStore()
+    if (settingsStore.webdavEnabled && settingsStore.webdavAutoBackupOnEndDay && saveStore.activeSlot >= 0) {
+      const daySerial = gameStore.year * 1000 + gameStore.seasonIndex * 100 + gameStore.day
+      enqueueAutoBackup(saveStore.activeSlot, daySerial)
+    }
+  }
 }
 
 export const useEndDay = () => {

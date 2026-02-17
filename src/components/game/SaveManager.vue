@@ -63,6 +63,21 @@
         <input ref="fileInputRef" type="file" accept=".tyx" class="hidden" @change="handleImportFile" />
       </template>
 
+
+      <div class="border border-accent/20 rounded-xs p-2 text-xs text-muted mt-2">
+        <p>最近远程备份：{{ lastRemoteBackupAt ? new Date(lastRemoteBackupAt).toLocaleString() : '暂无' }}</p>
+      </div>
+      <div class="grid grid-cols-2 gap-2 mt-2">
+        <button class="btn text-center justify-center text-sm" :disabled="isBackingUp" @click="handleBackupNow">
+          <Upload :size="14" />
+          {{ isBackingUp ? '备份中...' : '立即备份' }}
+        </button>
+        <button class="btn text-center justify-center text-sm" :disabled="isRestoring" @click="handleRestoreNow">
+          <Download :size="14" />
+          {{ isRestoring ? '恢复中...' : '立即恢复' }}
+        </button>
+      </div>
+
       <!-- 删除存档确认弹窗 -->
       <Transition name="panel-fade">
         <div
@@ -90,6 +105,7 @@
   import { SEASON_NAMES } from '@/stores/useGameStore'
   import { useSaveStore } from '@/stores/useSaveStore'
   import { showFloat } from '@/composables/useGameLog'
+  import { useWebdavBackup } from '@/composables/useWebdavBackup'
 
   defineProps<{ allowLoad?: boolean }>()
   const emit = defineEmits<{ close: []; load: [slot: number]; change: [] }>()
@@ -99,6 +115,7 @@
   const isWebView = window.__WEBVIEW__
 
   const slots = ref(saveStore.getSlots())
+  const { backupNow, restoreNow, isBackingUp, isRestoring, lastRemoteBackupAt } = useWebdavBackup()
   const menuOpen = ref<number | null>(null)
 
   const refreshSlots = () => {
@@ -131,6 +148,18 @@
 
   const triggerImport = () => {
     fileInputRef.value?.click()
+  }
+
+  const handleBackupNow = async () => {
+    await backupNow()
+  }
+
+  const handleRestoreNow = async () => {
+    const ok = await restoreNow()
+    if (ok) {
+      refreshSlots()
+      emit('change')
+    }
   }
 
   const handleImportFile = (e: Event) => {

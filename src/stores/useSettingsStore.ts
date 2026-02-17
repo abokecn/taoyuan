@@ -1,5 +1,6 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
+import CryptoJS from 'crypto-js'
 import { useAudio } from '@/composables/useAudio'
 import { getThemeByKey, type ThemeKey } from '@/data/themes'
 import { applyQmsgConfig } from '@/composables/useGameLog'
@@ -10,6 +11,22 @@ export type QmsgLimitWidthWrap = 'no-wrap' | 'wrap' | 'ellipsis'
 const DEFAULT_FONT_SIZE = 16
 const DEFAULT_THEME: ThemeKey = 'dark'
 const DEFAULT_QMSG_POSITION: QmsgPosition = 'bottom'
+const SETTINGS_WEB_DAV_PASSWORD_KEY = 'taoyuan_settings_webdav_password'
+
+const encryptWebdavPassword = (password: string): string => {
+  if (!password) return ''
+  return CryptoJS.AES.encrypt(password, SETTINGS_WEB_DAV_PASSWORD_KEY).toString()
+}
+
+const decryptWebdavPassword = (cipher: string): string => {
+  if (!cipher) return ''
+  try {
+    const bytes = CryptoJS.AES.decrypt(cipher, SETTINGS_WEB_DAV_PASSWORD_KEY)
+    return bytes.toString(CryptoJS.enc.Utf8) || ''
+  } catch {
+    return ''
+  }
+}
 
 export const useSettingsStore = defineStore('settings', () => {
   const fontSize = ref(DEFAULT_FONT_SIZE)
@@ -25,6 +42,18 @@ export const useSettingsStore = defineStore('settings', () => {
   const qmsgShowClose = ref(false)
   const qmsgShowIcon = ref(false)
   const qmsgShowReverse = ref(false)
+  const webdavEnabled = ref(false)
+  const webdavEndpoint = ref('')
+  const webdavUsername = ref('')
+  const webdavPassword = ref('')
+  const webdavPasswordEncrypted = ref('')
+  const webdavAutoBackupOnEndDay = ref(false)
+  const webdavBackupInterval = ref(1)
+
+  const setWebdavPassword = (password: string) => {
+    webdavPassword.value = password
+    webdavPasswordEncrypted.value = encryptWebdavPassword(password)
+  }
 
   const applyFontSize = () => {
     document.documentElement.style.fontSize = fontSize.value + 'px'
@@ -86,7 +115,13 @@ export const useSettingsStore = defineStore('settings', () => {
       qmsgAutoClose: qmsgAutoClose.value,
       qmsgShowClose: qmsgShowClose.value,
       qmsgShowIcon: qmsgShowIcon.value,
-      qmsgShowReverse: qmsgShowReverse.value
+      qmsgShowReverse: qmsgShowReverse.value,
+      webdavEnabled: webdavEnabled.value,
+      webdavEndpoint: webdavEndpoint.value,
+      webdavUsername: webdavUsername.value,
+      webdavPasswordEncrypted: webdavPasswordEncrypted.value || encryptWebdavPassword(webdavPassword.value),
+      webdavAutoBackupOnEndDay: webdavAutoBackupOnEndDay.value,
+      webdavBackupInterval: webdavBackupInterval.value
     }
   }
 
@@ -106,6 +141,18 @@ export const useSettingsStore = defineStore('settings', () => {
     qmsgShowClose.value = data?.qmsgShowClose ?? false
     qmsgShowIcon.value = data?.qmsgShowIcon ?? false
     qmsgShowReverse.value = data?.qmsgShowReverse ?? false
+    webdavEnabled.value = data?.webdavEnabled ?? false
+    webdavEndpoint.value = data?.webdavEndpoint ?? ''
+    webdavUsername.value = data?.webdavUsername ?? ''
+    const encrypted = data?.webdavPasswordEncrypted ?? ''
+    webdavPasswordEncrypted.value = encrypted
+    webdavPassword.value = decryptWebdavPassword(encrypted)
+    if (!webdavPassword.value && data?.webdavPassword) {
+      webdavPassword.value = data.webdavPassword
+      webdavPasswordEncrypted.value = encryptWebdavPassword(data.webdavPassword)
+    }
+    webdavAutoBackupOnEndDay.value = data?.webdavAutoBackupOnEndDay ?? false
+    webdavBackupInterval.value = Math.max(1, Number(data?.webdavBackupInterval ?? 1))
     syncQmsgConfig()
     const { sfxEnabled, bgmEnabled } = useAudio()
     sfxEnabled.value = data?.sfxEnabled ?? true
@@ -126,6 +173,15 @@ export const useSettingsStore = defineStore('settings', () => {
     qmsgShowClose,
     qmsgShowIcon,
     qmsgShowReverse,
+    webdavEnabled,
+    webdavEndpoint,
+    webdavUsername,
+    webdavPassword,
+    webdavPasswordEncrypted,
+    webdavAutoBackupOnEndDay,
+    webdavBackupInterval,
+    encryptWebdavPassword,
+    setWebdavPassword,
     changeFontSize,
     changeTheme,
     changeQmsgPosition,

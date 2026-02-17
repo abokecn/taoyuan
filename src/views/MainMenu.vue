@@ -317,12 +317,26 @@
         </div>
       </div>
     </Transition>
+
+    <Transition name="panel-fade">
+      <div v-if="showRemoteRestorePrompt" class="fixed inset-0 z-60 flex items-center justify-center bg-bg/80" @click.self="handleSkipRemoteRestore">
+        <div class="game-panel w-full max-w-xs mx-4 text-center">
+          <p class="text-accent text-sm mb-2">检测到远程新备份</p>
+          <p class="text-xs text-muted mb-4">存档 {{ (remoteRestoreSlot ?? 0) + 1 }} 的 WebDAV 备份更新，是否恢复以避免覆盖进度？</p>
+          <div class="flex gap-3 justify-center">
+            <button class="btn text-xs" @click="handleSkipRemoteRestore">稍后处理</button>
+            <button class="btn text-xs" @click="handleConfirmRemoteRestore">立即恢复</button>
+          </div>
+        </div>
+      </div>
+    </Transition>
+
   </div>
 </template>
 
 <script setup lang="ts">
   import { Play, FolderOpen, ArrowLeft, Trash2, Download, Upload, Info, Settings, ShieldCheck, X } from 'lucide-vue-next'
-  import { ref, computed } from 'vue'
+  import { ref, computed, onMounted } from 'vue'
   import { useRouter } from 'vue-router'
   import { useGameStore, SEASON_NAMES } from '@/stores/useGameStore'
   import { useSaveStore } from '@/stores/useSaveStore'
@@ -335,6 +349,7 @@
   import { useAudio } from '@/composables/useAudio'
   import { showFloat } from '@/composables/useGameLog'
   import type { FarmMapType, Gender } from '@/types'
+  import { useWebdavBackup } from '@/composables/useWebdavBackup'
 
   const router = useRouter()
   const { startBgm } = useAudio()
@@ -346,6 +361,7 @@
   const animalStore = useAnimalStore()
   const playerStore = usePlayerStore()
   const questStore = useQuestStore()
+  const { checkRemoteNewerBackup, restoreNow } = useWebdavBackup()
 
   const slots = ref(saveStore.getSlots())
   const showCharCreate = ref(false)
@@ -358,6 +374,8 @@
   const charGender = ref<Gender>('male')
   const showPrivacy = ref(false)
   const showFarmConfirm = ref(false)
+  const showRemoteRestorePrompt = ref(false)
+  const remoteRestoreSlot = ref<number | null>(null)
 
   const deleteTargetSlot = ref<number | null>(null)
 
@@ -496,6 +514,35 @@
   const triggerImport = () => {
     fileInputRef.value?.click()
   }
+
+
+  const handleConfirmRemoteRestore = async () => {
+    if (remoteRestoreSlot.value === null) return
+    saveStore.activeSlot = remoteRestoreSlot.value
+    const ok = await restoreNow()
+    if (ok) {
+      refreshSlots()
+    }
+    showRemoteRestorePrompt.value = false
+    remoteRestoreSlot.value = null
+  }
+
+  const handleSkipRemoteRestore = () => {
+    showRemoteRestorePrompt.value = false
+    remoteRestoreSlot.value = null
+  }
+
+  onMounted(async () => {
+    for (const slot of slots.value) {
+      if (!slot.exists) continue
+      const result = await checkRemoteNewerBackup(slot.slot, slot.savedAt)
+      if (result.isRemoteNewer) {
+        remoteRestoreSlot.value = slot.slot
+        showRemoteRestorePrompt.value = true
+        break
+      }
+    }
+  })
 
   const handleImportFile = (e: Event) => {
     const input = e.target as HTMLInputElement

@@ -53,6 +53,51 @@
                 </button>
               </div>
             </div>
+
+            <!-- WebDAV 备份 -->
+            <div class="border border-accent/20 rounded-xs p-3 text-left">
+              <p class="text-xs text-muted mb-2 text-center">WebDAV 云备份</p>
+              <div class="flex items-center justify-center gap-1 mb-2">
+                <button
+                  class="btn text-xs py-0 px-2"
+                  :class="settingsStore.webdavEnabled ? 'bg-accent/20! text-accent! border-accent!' : ''"
+                  @click="settingsStore.webdavEnabled = true"
+                >
+                  开
+                </button>
+                <button
+                  class="btn text-xs py-0 px-2"
+                  :class="!settingsStore.webdavEnabled ? 'bg-accent/20! text-accent! border-accent!' : ''"
+                  @click="settingsStore.webdavEnabled = false"
+                >
+                  关
+                </button>
+              </div>
+              <div class="flex flex-col gap-2">
+                <input v-model.trim="settingsStore.webdavEndpoint" type="text" placeholder="WebDAV 地址（https://...）" class="w-full px-2 py-1 bg-bg border border-accent/30 rounded-xs text-xs outline-none" />
+                <input v-model.trim="settingsStore.webdavUsername" type="text" placeholder="用户名" class="w-full px-2 py-1 bg-bg border border-accent/30 rounded-xs text-xs outline-none" />
+                <input :value="settingsStore.webdavPassword" type="password" placeholder="密码（本地加密存储）" class="w-full px-2 py-1 bg-bg border border-accent/30 rounded-xs text-xs outline-none" @input="handleWebdavPasswordInput" />
+              </div>
+              <div class="mt-2">
+                <p class="text-xs text-muted mb-1">日结自动备份</p>
+                <div class="flex items-center gap-1">
+                  <button class="btn text-xs py-0 px-2" :class="settingsStore.webdavAutoBackupOnEndDay ? 'bg-accent/20! text-accent! border-accent!' : ''" @click="settingsStore.webdavAutoBackupOnEndDay = true">开</button>
+                  <button class="btn text-xs py-0 px-2" :class="!settingsStore.webdavAutoBackupOnEndDay ? 'bg-accent/20! text-accent! border-accent!' : ''" @click="settingsStore.webdavAutoBackupOnEndDay = false">关</button>
+                </div>
+              </div>
+              <div class="mt-2">
+                <p class="text-xs text-muted mb-1">备份间隔（天）</p>
+                <div class="flex items-center justify-center gap-2">
+                  <button class="btn text-xs py-0 px-1.5" :disabled="settingsStore.webdavBackupInterval <= 1" @click="settingsStore.webdavBackupInterval = Math.max(1, settingsStore.webdavBackupInterval - 1)">
+                    <Minus :size="10" />
+                  </button>
+                  <span class="text-xs w-8 text-center">{{ settingsStore.webdavBackupInterval }}</span>
+                  <button class="btn text-xs py-0 px-1.5" :disabled="settingsStore.webdavBackupInterval >= 30" @click="settingsStore.webdavBackupInterval = Math.min(30, settingsStore.webdavBackupInterval + 1)">
+                    <Plus :size="10" />
+                  </button>
+                </div>
+              </div>
+            </div>
           </template>
 
           <!-- ===== 外观 ===== -->
@@ -335,5 +380,10 @@
   const setBool = (key: BoolSettingKey, value: boolean) => {
     settingsStore[key] = value
     settingsStore.syncQmsgConfig()
+  }
+
+  const handleWebdavPasswordInput = (e: Event) => {
+    const target = e.target as HTMLInputElement
+    settingsStore.setWebdavPassword(target.value)
   }
 </script>

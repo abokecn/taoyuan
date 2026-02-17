@@ -73,6 +73,16 @@ export const useSaveStore = defineStore('save', () => {
   /** 当前活跃存档槽位（-1 表示未分配） */
   const activeSlot = ref(-1)
 
+
+  const getRawSave = (slot: number): string | null => {
+    if (slot < 0 || slot >= MAX_SLOTS) return null
+    return localStorage.getItem(`${SAVE_KEY_PREFIX}${slot}`)
+  }
+
+  const parseSave = (raw: string): Record<string, any> | null => {
+    return parseSaveData(raw)
+  }
+
   /** 获取所有存档槽位信息 */
   const getSlots = (): SaveSlotInfo[] => {
     const slots: SaveSlotInfo[] = []
@@ -283,5 +293,17 @@ export const useSaveStore = defineStore('save', () => {
     }
   }
 
-  return { activeSlot, getSlots, assignNewSlot, saveToSlot, autoSave, loadFromSlot, deleteSlot, exportSave, importSave }
+  return {
+    activeSlot,
+    getSlots,
+    getRawSave,
+    parseSave,
+    assignNewSlot,
+    saveToSlot,
+    autoSave,
+    loadFromSlot,
+    deleteSlot,
+    exportSave,
+    importSave
+  }
 })
