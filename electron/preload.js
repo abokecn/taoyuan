@@ -11,5 +11,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   restartWindow: () => ipcRenderer.invoke('restart-window'),
 
   // 退出应用
-  quitApp: () => ipcRenderer.invoke('quit-app')
+  quitApp: () => ipcRenderer.invoke('quit-app'),
+
+  // WebDAV 请求代理（Electron 环境下绕过浏览器 CORS 限制）
+  webdavRequest: (url, options) => ipcRenderer.invoke('webdav-request', { url, options })
 })

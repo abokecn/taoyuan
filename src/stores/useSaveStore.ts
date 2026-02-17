@@ -25,11 +25,50 @@ import { useMuseumStore } from './useMuseumStore'
 import { useGuildStore } from './useGuildStore'
 import { useSecretNoteStore } from './useSecretNoteStore'
 import { useHanhaiStore } from './useHanhaiStore'
+import { showFloat } from '@/composables/useGameLog'
+import {
+  backupCipherTextToWebdav,
+  restoreLatestCipherTextFromWebdav,
+  type WebdavConfig
+} from '@/services/webdav'
 
 const SAVE_KEY_PREFIX = 'taoyuanxiang_save_'
 const MAX_SLOTS = 3
 const ENCRYPTION_KEY = 'taoyuanxiang_2024_secret'
 const SAVE_FILE_EXT = '.tyx'
+const WEBDAV_BACKUP_CONFIG_KEY = 'taoyuan_webdav_backup_config'
+
+interface BackupProvider {
+  backupSave: (slot: number, rawCipherText: string) => Promise<void>
+  restoreLatestSave: (slot: number) => Promise<string | null>
+}
+
+const loadWebdavConfig = (): WebdavConfig | null => {
+  try {
+    const raw = localStorage.getItem(WEBDAV_BACKUP_CONFIG_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as WebdavConfig
+    if (!parsed.enabled || !parsed.url || !parsed.username || !parsed.password) return null
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+const createBackupProvider = (): BackupProvider => {
+  return {
+    backupSave: async (slot: number, rawCipherText: string) => {
+      const config = loadWebdavConfig()
+      if (!config) return
+      await backupCipherTextToWebdav(config, slot, rawCipherText)
+    },
+    restoreLatestSave: async (slot: number) => {
+      const config = loadWebdavConfig()
+      if (!config) return null
+      return restoreLatestCipherTextFromWebdav(config, slot)
+    }
+  }
+}
 
 /** 加密 JSON 字符串 */
 const encrypt = (json: string): string => {
@@ -70,6 +109,8 @@ export interface SaveSlotInfo {
 }
 
 export const useSaveStore = defineStore('save', () => {
+  const backupProvider = createBackupProvider()
+
   /** 当前活跃存档槽位（-1 表示未分配） */
   const activeSlot = ref(-1)
 
@@ -168,7 +209,12 @@ export const useSaveStore = defineStore('save', () => {
         hanhai: hanhaiStore.serialize(),
         savedAt: new Date().toISOString()
       }
-      localStorage.setItem(`${SAVE_KEY_PREFIX}${slot}`, encrypt(JSON.stringify(data)))
+      const rawCipherText = encrypt(JSON.stringify(data))
+      localStorage.setItem(`${SAVE_KEY_PREFIX}${slot}`, rawCipherText)
+      void backupProvider.backupSave(slot, rawCipherText).catch(error => {
+        console.error('[SaveBackup] WebDAV backup failed:', error)
+        showFloat('本地存档成功，远程备份失败（不影响继续游戏）。')
+      })
       activeSlot.value = slot
       return true
     } catch {
@@ -283,5 +329,22 @@ export const useSaveStore = defineStore('save', () => {
     }
   }
 
-  return { activeSlot, getSlots, assignNewSlot, saveToSlot, autoSave, loadFromSlot, deleteSlot, exportSave, importSave }
+  /** 从远程恢复最新备份到本地槽位（不覆盖当前游戏状态） */
+  const restoreLatestBackupToSlot = async (slot: number): Promise<boolean> => {
+    if (slot < 0 || slot >= MAX_SLOTS) return false
+    try {
+      const raw = await backupProvider.restoreLatestSave(slot)
+      if (!raw) return false
+      const data = parseSaveData(raw)
+      if (!data) return false
+      localStorage.setItem(`${SAVE_KEY_PREFIX}${slot}`, raw)
+      return true
+    } catch (error) {
+      console.error('[SaveBackup] Restore from WebDAV failed:', error)
+      showFloat('远程恢复失败，请检查网络、CORS 或 HTTPS 证书设置。')
+      return false
+    }
+  }
+
+  return { activeSlot, getSlots, assignNewSlot, saveToSlot, autoSave, loadFromSlot, deleteSlot, exportSave, importSave, restoreLatestBackupToSlot }
 })

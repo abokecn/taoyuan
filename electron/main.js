@@ -214,6 +214,38 @@ ipcMain.handle('quit-app', () => {
   app.quit()
 })
 
+
+ipcMain.handle('webdav-request', async (_, payload) => {
+  const { url, options } = payload || {}
+  if (!url || !options?.method) {
+    return { ok: false, status: 400, statusText: 'Bad Request', text: '' }
+  }
+
+  try {
+    const response = await fetch(url, {
+      method: options.method,
+      headers: options.headers,
+      body: options.body
+    })
+    const text = await response.text()
+    const headers = Object.fromEntries(response.headers.entries())
+    return {
+      ok: response.ok,
+      status: response.status,
+      statusText: response.statusText,
+      text,
+      headers
+    }
+  } catch (error) {
+    return {
+      ok: false,
+      status: 599,
+      statusText: error instanceof Error ? error.message : 'Network Error',
+      text: ''
+    }
+  }
+})
+
 app.whenReady().then(() => {
   createWindow()
 
